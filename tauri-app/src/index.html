@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri App</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <div
+      id="hint"
+      style="
+        font-family: sans-serif;
+        font-size: 24px;
+        color: #00ff00;
+        text-shadow: 0 0 5px #000;
+        margin-top: 40vh;
+        text-align: center;
+      "
+    >
+      Hello, Aegis!
+    </div>
+    <script>
+      // Позже сюда придёт fetch/WS и обновление текста.
+    </script>
+    <script>
+      async function refresh() {
+        try {
+          const r = await fetch("http://127.0.0.1:5000/hint");
+          const j = await r.json();
+          document.getElementById("hint").innerText = j.hint;
+        } catch (err) {
+          console.error("Hint fetch failed:", err);   // ← увидеть CORS‑ошибку
+        }
+      }
+      setInterval(refresh, 500);   // 2 Гц
+      refresh();
+    </script>
+  </body>
+</html>
