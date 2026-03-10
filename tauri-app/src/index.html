@@ -2,41 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
-    <script type="module" src="/main.js" defer></script>
+    <title>Aegis Assistant Overlay</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body>
-    <div
-      id="hint"
-      style="
-        font-family: sans-serif;
-        font-size: 24px;
-        color: #00ff00;
-        text-shadow: 0 0 5px #000;
-        margin-top: 40vh;
-        text-align: center;
-      "
-    >
-      Hello, Aegis!
+    <div class="overlay">
+      <!-- Status indicator -->
+      <div id="status" class="status disconnected">● Connecting…</div>
+
+      <!-- Main hint -->
+      <div id="hint-text" class="hint">Waiting for data…</div>
+
+      <!-- Confidence bar -->
+      <div class="confidence-row">
+        <div class="confidence-bar">
+          <div id="confidence-fill" class="confidence-fill" style="width: 0%"></div>
+        </div>
+        <span id="confidence-label" class="confidence-label">—</span>
+      </div>
     </div>
-    <script>
-      // Позже сюда придёт fetch/WS и обновление текста.
-    </script>
-    <script>
-      async function refresh() {
-        try {
-          const r = await fetch("http://127.0.0.1:5000/hint");
-          const j = await r.json();
-          document.getElementById("hint").innerText = j.hint;
-        } catch (err) {
-          console.error("Hint fetch failed:", err);   // ← увидеть CORS‑ошибку
-        }
-      }
-      setInterval(refresh, 500);   // 2 Гц
-      refresh();
-    </script>
+
+    <script src="main.js"></script>
   </body>
 </html>
