@@ -1,95 +1,139 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fetch_matches.py  • v4  (June‑2025)
+fetch_matches.py — download high-MMR matches from OpenDota.
 
-Скачивает N high‑MMR игр и сохраняет их JSON в data/raw/.
+Usage:
+    python scripts/fetch_matches.py --count 1000 --min-rank 70
 
-CLI:
-  --count     <int>   (default 1000)
-  --min-rank  <int>   avg_rank_tier threshold (default 70)
-  --api-key   <str>   OpenDota API‑key (или перем. окруж. OD_API_KEY)
-  --out       <dir>   куда класть .json (default data/raw)
-
-Пример:
-  $env:OD_API_KEY = e1c74fdf-c58a-4f09-b777-4b0937475907   # PowerShell
-  python fetch_matches.py --count 3500 --min-rank 70
+Environment:
+    OD_API_KEY — OpenDota API key (optional, increases rate limit).
 """
 
 from __future__ import annotations
-import argparse, json, pathlib, time, os, sys, random, requests
+
+import argparse
+import json
+import os
+import pathlib
+import random
+import sys
+import time
+
+import requests
 
 OD_API = "https://api.opendota.com/api"
 
-def GET(endpoint: str, api_key: str | None = None,
-        params: dict | None = None, retry: int = 5):
-    params = params.copy() if params else {}
+
+def create_session(api_key: str | None = None) -> requests.Session:
+    """Create a requests Session with default params and headers."""
+    s = requests.Session()
+    s.headers["User-Agent"] = "AegisAssistant/1.0 (github.com/larelgit/Aegis-Assistant-v1)"
     if api_key:
-        params["api_key"] = api_key
-    backoff = 2
-    for attempt in range(1, retry + 1):
-        r = requests.get(f"{OD_API}/{endpoint.lstrip('/')}", params=params, timeout=20)
+        s.params["api_key"] = api_key  # type: ignore[assignment]
+    return s
+
+
+def GET(session: requests.Session, endpoint: str,
+        params: dict | None = None, retries: int = 5):
+    """GET with exponential backoff on 429 / 5xx."""
+    params = params or {}
+    backoff = 2.0
+    for attempt in range(1, retries + 1):
+        r = session.get(f"{OD_API}/{endpoint.lstrip('/')}", params=params, timeout=20)
         if r.status_code == 429:
             delay = backoff + random.random()
-            print(f"[429] retry {attempt}/{retry} in {delay:.1f}s", file=sys.stderr)
-            time.sleep(delay); backoff *= 2; continue
+            print(f"  [429] retry {attempt}/{retries} in {delay:.1f}s", file=sys.stderr)
+            time.sleep(delay)
+            backoff *= 2
+            continue
         try:
             r.raise_for_status()
             return r.json()
-        except requests.HTTPError as e:
-            if attempt == retry or r.status_code < 500:
-                raise e
+        except requests.HTTPError as exc:
+            if attempt == retries or r.status_code < 500:
+                raise exc
             delay = backoff + random.random()
-            print(f"[{r.status_code}] retry in {delay:.1f}s", file=sys.stderr)
-            time.sleep(delay); backoff *= 2
+            print(f"  [{r.status_code}] retry in {delay:.1f}s", file=sys.stderr)
+            time.sleep(delay)
+            backoff *= 2
+    return None
 
-def page_public_matches(less_than: int | None, key: str | None):
-    params = {"less_than_match_id": less_than} if less_than else {}
-    return GET("publicMatches", key, params)
 
-def collect_ids(n: int, min_rank: int, key: str | None):
-    ids, seen, last = [], set(), None
+def collect_ids(session: requests.Session, n: int, min_rank: int) -> list[int]:
+    """Page through publicMatches and collect match IDs above min_rank."""
+    ids: list[int] = []
+    seen: set[int] = set()
+    last: int | None = None
+    has_key = bool(session.params.get("api_key"))
+
     while len(ids) < n:
-        batch = page_public_matches(last, key)
-        if not batch: break
+        params = {"less_than_match_id": last} if last else {}
+        batch = GET(session, "publicMatches", params)
+        if not batch:
+            break
         for m in batch:
-            mid = m["match_id"]; last = mid
-            if mid in seen: continue
+            mid = m["match_id"]
+            last = mid
+            if mid in seen:
+                continue
             seen.add(mid)
             if m.get("avg_rank_tier", 0) >= min_rank:
                 ids.append(mid)
-                if len(ids) >= n: break
-        time.sleep(0.5 if key else 1.1)      # throttle
+                if len(ids) >= n:
+                    break
+        time.sleep(0.5 if has_key else 1.1)
     return ids
 
-def save_match(mid: int, out: pathlib.Path, key: str | None):
+
+def save_match(session: requests.Session, mid: int, out: pathlib.Path) -> bool:
+    """Download and save a single match JSON. Returns True if saved."""
     fn = out / f"{mid}.json"
-    if fn.exists(): return
-    data = GET(f"matches/{mid}", key)
-    fn.write_text(json.dumps(data, indent=2))
-    print("saved", mid)
+    if fn.exists():
+        return False
+    data = GET(session, f"matches/{mid}")
+    fn.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return True
+
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--count",     type=int, default=1000)
-    ap.add_argument("--min-rank",  type=int, default=70)
-    ap.add_argument("--api-key",   type=str,
-                    default=os.getenv("OD_API_KEY", "").strip('"').strip("'"))
-    ap.add_argument("--out",       type=pathlib.Path, default=pathlib.Path("data/raw"))
+    ap = argparse.ArgumentParser(description="Download high-MMR Dota 2 matches from OpenDota")
+    ap.add_argument("--count",    type=int, default=1000, help="Number of matches to fetch")
+    ap.add_argument("--min-rank", type=int, default=70,   help="Minimum avg_rank_tier")
+    ap.add_argument("--api-key",  type=str,
+                    default=os.getenv("OD_API_KEY", "").strip('"').strip("'"),
+                    help="OpenDota API key (or set OD_API_KEY env var)")
+    ap.add_argument("--out",      type=pathlib.Path, default=pathlib.Path("data/raw"))
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
-    if args.api_key:
-        print("✓ using API‑key")
+    key = args.api_key or None
+    session = create_session(key)
+
+    if key:
+        print("✓ Using API key")
     else:
-        print("⚠ no API‑key — будет лимит 60 rq/min", file=sys.stderr)
+        print("⚠ No API key — rate limited to ~60 req/min", file=sys.stderr)
 
-    ids = collect_ids(args.count, args.min_rank, args.api_key)
-    print(f"collected {len(ids)} match ids; downloading…")
+    # Phase 1: collect match IDs
+    ids = collect_ids(session, args.count, args.min_rank)
+    print(f"Collected {len(ids)} match IDs; downloading…")
 
-    for mid in ids:
-        try:    save_match(mid, args.out, args.api_key)
-        except Exception as e: print("skip", mid, e, file=sys.stderr)
+    # Phase 2: download full match data
+    saved = skipped = failed = 0
+    for i, mid in enumerate(ids, 1):
+        try:
+            if save_match(session, mid, args.out):
+                saved += 1
+                print(f"  [{i}/{len(ids)}] saved {mid}")
+            else:
+                skipped += 1
+        except Exception as exc:
+            failed += 1
+            print(f"  [{i}/{len(ids)}] SKIP {mid}: {exc}", file=sys.stderr)
+
+    print(f"\n✓ Done — saved: {saved}  skipped (exists): {skipped}  failed: {failed}")
+
 
 if __name__ == "__main__":
     main()
