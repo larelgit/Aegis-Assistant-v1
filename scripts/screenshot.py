@@ -1,23 +1,34 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Захватываем миникарту в правом‑нижнем углу экрана (16:9).
-– Точка (left, top) = (screen_w - W, screen_h - H)
-– Каждые 0.15 с кладём картинку в глобальную переменную LAST_MINIMAP.
+screenshot.py — experimental minimap capture (Windows-only).
+
+Captures the bottom-right corner of the screen (minimap in 16:9 Dota 2).
+Stores the latest frame in LAST_MINIMAP for potential future CV processing.
+
+NOTE: This module is OPTIONAL. Enable via --capture-minimap flag in runtime_server.py.
+      Requires: opencv-python, mss, ctypes (Windows)
 """
-import cv2, numpy as np, os
-from mss import mss
-from time import sleep
-from threading import Thread
+
 import ctypes
+from threading import Thread
+from time import sleep
 
-# 1. Узнаём реальное разрешение рабочего стола
+import cv2
+import numpy as np
+from mss import mss
+
+# Detect real desktop resolution (Windows)
 user32 = ctypes.windll.user32
-SCREEN_W, SCREEN_H = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+SCREEN_W = user32.GetSystemMetrics(0)
+SCREEN_H = user32.GetSystemMetrics(1)
 
-# 2. Размер миникарты под стандартное 16:9 (поправьте при другом GUI‑scale)
+# Minimap region (standard 16:9, adjust for different GUI scales)
 W, H = 300, 270
 MONITOR = {"left": SCREEN_W - W, "top": SCREEN_H - H, "width": W, "height": H}
 
-LAST_MINIMAP = None  # глобальное хранилище картинки
+LAST_MINIMAP = None  # global frame storage
+
 
 def capture_loop():
     global LAST_MINIMAP
@@ -26,6 +37,7 @@ def capture_loop():
             img = np.array(sct.grab(MONITOR))
             LAST_MINIMAP = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
             sleep(0.15)
+
 
 def start():
     Thread(target=capture_loop, daemon=True).start()
