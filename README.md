@@ -123,10 +123,10 @@ Evaluation artifacts are saved to `data/artifacts/`:
 
 ```
 ┌──────────┐     ┌──────────────┐     ┌───────────────┐     ┌─────────┐
-│ OpenDota │────▸│ build_dataset│────▸│  train_model   │────▸│  .pkl   │
-│   API    │     │    .py       │     │     .py        │     │ bundle  │
+│ OpenDota │────▸│ build_dataset│────▸│  train_model  │────▸│  .pkl   │
+│   API    │     │    .py       │     │     .py       │     │ bundle  │
 └──────────┘     └──────────────┘     └───────────────┘     └────┬────┘
-                                                                  │
+                                                                 │
 ┌──────────┐     ┌──────────────┐     ┌───────────────┐          │
 │  Dota 2  │────▸│   runtime    │────▸│  serve_model  │◂─────────┘
 │   GSI    │     │  _server.py  │     │     .py       │
