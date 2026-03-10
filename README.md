@@ -14,7 +14,7 @@
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/aegis-assistant.git
+git clone https://github.com/larelgit/Aegis-Assistant-v1.git
 cd aegis-assistant
 ```
 
