@@ -15,7 +15,7 @@
 
 ```bash
 git clone https://github.com/larelgit/Aegis-Assistant-v1.git
-cd aegis-assistant
+cd Aegis-Assistant-v1
 ```
 
 ### 2. Install dependencies
