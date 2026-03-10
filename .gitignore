@@ -1,4 +1,20 @@
 __pycache__/
 *.pyc
-data/
-.gsi_logs/
+*.pyo
+
+# Runtime logs
+gsi_logs/
+
+# Data artifacts (large / generated)
+data/raw/
+data/snapshots/
+data/artifacts/
+
+# Keep models dir structure but ignore heavy files
+data/models/*.pkl
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
